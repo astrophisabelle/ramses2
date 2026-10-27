@@ -77,6 +77,9 @@ module amr_commons
      integer::ngridmax=0         ! Maximum number of grids
      integer::ncachemax=10000    ! Maximum number of cache lines
      integer::npartmax=0         ! Maximum number of DM particles
+     logical::uniform_cycle=.false.  ! Cycle the whole uniform mesh between levels
+     real(kind=8)::uniform_cycle_t0=0.0d0  ! Fixed simulation time at beginnnig so code knows direction of ref.
+     real(kind=8),dimension(1:MAXLEVEL)::uniform_cycle_dwell=0.0d0   ! Dwell times remapped to mesh levels
      integer::nstarmax=0         ! Maximum number of star particles
      integer::nsinkmax=0         ! Maximum number of sink particles
      integer::ncoremax=0         ! Maximum number of core particles
