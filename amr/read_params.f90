@@ -106,6 +106,12 @@ subroutine m_read_params(pst)
   integer::ncachemax=10000    ! Maximum number of cache lines
   real(kind=8)::boxlen=1.0D0      ! Cell sixe at level 0
 
+  ! Uniform cyclic refinement parameters
+  logical::uniform_cycle=.false.        ! Cycle the whole uniform mesh between levels
+  real(kind=8)::uniform_cycle_t0=0.0d0  ! Simulation time at the start of the cycle, fixed reference combined w dwell array to find the direction of refinement. 
+  real(kind=8),dimension(1:MAXLEVEL)::uniform_cycle_dwell=0.0d0  ! Input order: levelmin to levelmax
+
+
   ! Output parameters
   integer::noutput=1          ! Total number of outputs
   integer::foutput=1000000    ! Frequency of outputs
@@ -613,6 +619,10 @@ subroutine m_read_params(pst)
   ! AMR grid basic parameters
   namelist/amr_params/levelmin,levelmax,ngridmax,ncachemax,ngridtot &
        & ,npartmax,nparttot,nexpand,boxlen
+
+  ! Uniform cyclic refinement parameters
+  namelist/cyclic_refine_params/uniform_cycle,uniform_cycle_t0,uniform_cycle_dwell
+
   ! Poisson solver parameters
   namelist/poisson_params/epsilon,nvcycle,gravity_type,gravity_params &
        & ,cg_levelmin,cic_levelmax,fast_solver,gravity_test &
@@ -844,6 +854,9 @@ subroutine m_read_params(pst)
   rewind(1)
   read(1,NML=amr_params)
   rewind(1)
+  read(1,NML=cyclic_refine_params,END=119)
+119 continue
+  rewind(1)
   read(1,NML=movie_params,END=82)
 82 continue
   rewind(1)
@@ -900,6 +913,12 @@ subroutine m_read_params(pst)
   !--------------------------------------------------
   levelmin=MAX(levelmin,1)
   nlevelmax=levelmax
+
+!=============ADDITON===============
+  !   check in nlevlelmax<=nlebvelmin? if nlevelmax>maxlevel? if dwell time dt
+  ! less than zero?
+
+!=================================
   nsuperoct=MIN(nsuperoct,5)
   nml_ok=.true.
   if(levelmin<1)then
@@ -1121,6 +1140,7 @@ subroutine m_read_params(pst)
   do i=nlevelmax,levelmin,-1
      nexpand   (i)=nexpand   (i-levelmin+1)
      nsubcycle (i)=nsubcycle (i-levelmin+1)
+     uniform_cycle_dwell(i)=uniform_cycle_dwell(i-levelmin+1) 
      r_refine  (i)=r_refine  (i-levelmin+1)
      a_refine  (i)=a_refine  (i-levelmin+1)
      b_refine  (i)=b_refine  (i-levelmin+1)
@@ -1483,6 +1503,12 @@ subroutine m_read_params(pst)
 
   s%r%levelmin=levelmin
   s%r%nlevelmax=nlevelmax
+  
+  ! These assignments make the parsed settings available to the mesh and timestep routines
+  s%r%uniform_cycle=uniform_cycle
+  s%r%uniform_cycle_t0=uniform_cycle_t0
+  s%r%uniform_cycle_dwell=uniform_cycle_dwell
+  
   s%r%ngridmax=ngridmax
   s%r%ncachemax=ncachemax
   s%r%npartmax=npartmax
