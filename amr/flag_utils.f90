@@ -12,6 +12,56 @@ module flag_utils
 #endif
 contains
 
+! Cyclic refinement function: Given simulation time and dwell times, determine
+!   refinement level
+integer function cyclic_refine_level(time,t0,dwell,levelmin,levelmax) result(target)
+   implicit none
+   real(kind=8),intent(in)::time,t0
+   real(kind=8),dimension(:),intent(in)::dwell
+   integer, intent(in)::levelmin,levelmax
+   integer::level,cycle_max
+   real(kind=8)::period,phase,edge
+
+   target=levelmin
+
+   ! Ignore trailing configured levels with zero dwell time.
+   cycle_max=levelmin
+   do level=levelmin,levelmax
+      if(dwell(level)>0.0d0)cycle_max=level 
+   end do
+
+   ! Count endpoint dwell times once; interior levels occur on both legs.
+   period=2.0d0*sum(dwell(levelmin:cycle_max)) &
+        -dwell(levelmin)-dwell(cycle_max)
+
+   ! MODULO returns a phase in [0,period), including for time<t0.
+   phase=modulo(time-t0,period)
+   edge=0.0d0
+
+   ! Ascending leg: levelmin to the highest level with positive dwell.
+   do level=levelmin,cycle_max
+      if(dwell(level)>0.0d0)then
+         edge=edge+dwell(level)
+         if(phase<edge)then
+            target=level
+            return
+         endif
+      endif
+   end do
+
+   ! Descending leg visits interior levels only; endpoints are not doubled.
+   do level=cycle_max-1,levelmin+1,-1
+      if(dwell(level)>0.0d0)then
+         edge=edge+dwell(level)
+         if(phase<edge)then
+            target=level
+            return
+         endif
+      endif
+   end do
+end function cyclic_refine_level
+!====================
+
 subroutine m_flag_fine(pst,ilevel,icount)
   use ramses_commons, only: pst_t
   use smooth_module, only: r_smooth_fine
