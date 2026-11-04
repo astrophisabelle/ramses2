@@ -913,12 +913,6 @@ subroutine m_read_params(pst)
   !--------------------------------------------------
   levelmin=MAX(levelmin,1)
   nlevelmax=levelmax
-
-!=============ADDITON===============
-  !   check in nlevlelmax<=nlebvelmin? if nlevelmax>maxlevel? if dwell time dt
-  ! less than zero?
-
-!=================================
   nsuperoct=MIN(nsuperoct,5)
   nml_ok=.true.
   if(levelmin<1)then
@@ -931,6 +925,44 @@ subroutine m_read_params(pst)
      write(*,*)'levelmax should not be lower than levelmin'
      nml_ok=.false.
   end if
+
+  ! Uniform cyclic refinement parameters
+  if(uniform_cycle)then
+    if(nlevelmax>=levelmin .and. nlevelmax<=MAXLEVEL)then
+      if(nlevelmax==levelmin)then
+        write(*,*)'Error in the namelist:'
+        write(*,*)'uniform_cycle requires levelmax greater than levelmin'
+        nml_ok=.false.
+      else if(all(uniform_cycle_dwell(1:nlevelmax-levelmin+1)==0.0d0))then
+        write(*,*)'Error in the namelist:'
+        write(*,*)'uniform_cycle requires at least one nonzero dwell time'
+        nml_ok=.false.
+      else if(count(uniform_cycle_dwell(1:nlevelmax-levelmin+1)>0.0d0)<2)then
+        write(*,*)'Error in the namelist:'
+        write(*,*)'uniform_cycle requires positive dwell times at two or more levels'
+        nml_ok=.false.
+      endif
+      do i=1,nlevelmax-levelmin+1
+        if(uniform_cycle_dwell(i)<0.0d0)then
+          write(*,'(A,I0,A,ES12.4)') &
+             'Error: negative uniform_cycle_dwell for level ', &
+             levelmin+i-1,': ',uniform_cycle_dwell(i)
+          nml_ok=.false.
+        endif
+        if(i>1)then
+          if(uniform_cycle_dwell(i-1)==0.0d0 .and. &
+             uniform_cycle_dwell(i)>0.0d0)then
+            write(*,'(A,I0,A,I0)') &
+               'Error: nonzero dwell at level ',levelmin+i-1, &
+               ' follows zero dwell at level ',levelmin+i-2
+            write(*,*)'All dwell times after zero must also be zero.'
+            nml_ok=.false.
+          endif
+        endif
+      enddo
+    endif
+  endif
+
   if(part_dep_algo<1 .or. part_dep_algo>3)then
      write(*,*)'Error in the namelist:'
      write(*,*)'part_dep_algo must be 1 (large), 2 (medium) or 3 (small)'
