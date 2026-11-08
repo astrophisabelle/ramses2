@@ -138,7 +138,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
   use oct_commons, only: oct
   use marshal, only: pack_fetch_refine, unpack_fetch_refine, pack_fetch_flag, unpack_fetch_flag
   use boundaries, only: init_bound_refine
-  use flag_utils, only: cyclic_refine_level
   use cache_commons
   use cache
   use hash
@@ -168,7 +167,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
   integer::noct_zero,head_zero,indx_zero
   integer::skip_bit,ikey,true_level
   integer::ind_cell,igrid,ind_parent
-  integer::target_level
   integer(kind=8),dimension(0:ndim)::hash_key
   integer(kind=8),dimension(1:nhilbert,1:s%r%nlevelmax)::key_ref
   integer(kind=8),dimension(1:nhilbert)::coarse_key
@@ -204,12 +202,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
   type(oct)::oct_tmp
 
   associate(r=>s%r,g=>s%g,m=>s%m,mdl=>s%mdl)
-  ! uniform cyclic refinement addition
-  target_level=r%nlevelmax ! Without default target_level might be read while uninitialized even if uniform_cycle=false
-  if(r%uniform_cycle)then
-   target_level=cyclic_refine_level(g%t,r%uniform_cycle_t0, &
-          r%uniform_cycle_dwell,r%levelmin,r%nlevelmax)
-  endif
 
   !---------------------------------------------------
   ! Step 1: if a cell is flagged for refinement and
@@ -228,11 +220,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
         do ind=1,twotondim
            ok   = m%flag1(ind,ioct)==1 .and. &
                 & .not.m%grid(ioct)%refined(ind)
-
-           ! change? ok = ((r%uniform_cycle .and. ilev < target_level) .or. & 
-                         ! & (.not.r%uniform_cycle .and. m%flag1(ind,ioct)==1)) .and. &
-                        ! & .not.m%grid(ioct)%refined(ind)
-
            if(ok)then
               ind_parent=ioct
               ind_cell=ind
@@ -249,11 +236,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
         do ind=1,twotondim
            ok   = m%flag1(ind,ioct)==1 .and. &
                 & .not.m%grid(ioct)%refined(ind)
-
-            ! change? ok = ((r%uniform_cycle .and. ilev < target_level) .or. & 
-                         ! & (.not.r%uniform_cycle .and. m%flag1(ind,ioct)==1)) .and. &
-                        ! & .not.m%grid(ioct)%refined(ind)
-                
            if(ok)then
               m%grid(ioct)%refined(ind)=.true.
            endif
@@ -272,11 +254,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
      do ilev=ilevel,r%nlevelmax-1
         do ioct=m%head(ilev),m%tail(ilev)
            do ind=1,twotondim
-
-            ! replace? ok   = m%grid(ioct)%refined(ind) .and. &
-            !           & ((r%uniform_cycle .and. ilev>target_level) .or. &
-            !           &  (.not.r%uniform_cycle .and. m%flag1(ind,ioct)==0))
-
               ok   = m%flag1(ind,ioct)==0 .and. &
                    & m%grid(ioct)%refined(ind)
               if(ok)then
@@ -324,11 +301,6 @@ subroutine refine_fine(s,ilevel,ncreate,nkill)
           write(*,*) 'FATAL: no parent',hash_key
           stop
         endif
-
-        ! replace: ok = m%grid(igrid)%refined(icell) .and. &    ! check if cell refined (must have children)
-        !    & ((r%uniform_cycle .and. ilev>target_level) .or. &  ! is UCR enabled, is current level>target?
-       !     &  (.not.r%uniform_cycle .and. m%flag1(icell,igrid)==0))   !original criteria
-
         ok   = m%flag1(icell,igrid)==0 .and. &
              & m%grid(igrid)%refined(icell)
         if(ok)then
