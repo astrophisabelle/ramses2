@@ -401,7 +401,6 @@ end subroutine unpack_flush_initflag
 !###############################################################
 recursive subroutine r_user_flag(pst,ilevel,input_size,noct,output_size)
   use mdl_module
-  use amr_parameters, only: twotondim
   use ramses_commons, only: pst_t
   use mdl_parameters
   implicit none
@@ -412,7 +411,7 @@ recursive subroutine r_user_flag(pst,ilevel,input_size,noct,output_size)
 
   integer::next_noct
   integer::nflag, level_lock
-  integer::igrid,ind,target_level
+  integer::target_level
   integer::rID
 
   if(pst%nLower>0)then
@@ -433,30 +432,18 @@ recursive subroutine r_user_flag(pst,ilevel,input_size,noct,output_size)
         endif
      endif
 
-     ! Uniform cyclic refinement: flag all cells below the target so they
-     ! refine, and clear flags at/above it so the normal regrid path can derefine.
+     ! In cyclic mode, the target level limits where user criteria may add flags.
+     ! Flags set earlier by initialization and smoothing are left unchanged.
      if(pst%s%r%uniform_cycle)then
-      ! pass in all parameters needed for cyclic_refine_level
         target_level=cyclic_refine_level(pst%s%g%t, &
-             pst%s%r%uniform_cycle_t0,pst%s%r%uniform_cycle_dwell, &
+             pst%s%r%uniform_cycle_t0, &
+             pst%s%r%uniform_cycle_dwell, &
              pst%s%r%levelmin,pst%s%r%nlevelmax)
-         ! initialize flag counter
-        pst%s%g%nflag=0
-        ! loop over all grids at this level and set flags according to the target level, 
-        ! and count cells flagged for refinement
-        do igrid=pst%s%m%head(ilevel),pst%s%m%tail(ilevel)
-           do ind=1,twotondim
-              if(ilevel<target_level)then
-                 pst%s%m%flag1(ind,igrid)=1
-                 pst%s%g%nflag=pst%s%g%nflag+1
-              else
-                 pst%s%m%flag1(ind,igrid)=0
-              endif
-           enddo
-        enddo
-        ! store the number of flagged cells in noct 
-        noct=pst%s%g%nflag
-        return
+        ! Keep the existing flag count and skip user criteria at/above the target.
+        if(ilevel.GE.target_level)then
+           noct=pst%s%g%nflag
+           return
+        endif
      endif
 
 #ifdef _CUDA
